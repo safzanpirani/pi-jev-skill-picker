@@ -13,7 +13,7 @@ export const SYSTEM_ONE_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 export const DEFAULT_MODEL = "jev-latest";
 export const DEFAULT_SHARD_SIZE = 50;
 export const DEFAULT_MAX_SKILLS = 3;
-export const DEFAULT_MIN_SCORE = 1.4;
+export const DEFAULT_MIN_SCORE = 1.6;
 export const DEFAULT_DESCRIPTION_LIMIT = 1200;
 export const DEFAULT_TIMEOUT_MS = 20_000;
 

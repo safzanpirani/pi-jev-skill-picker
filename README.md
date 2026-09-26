@@ -46,7 +46,7 @@ Precedence is environment variable, then `skill-jev.json` under `PI_CODING_AGENT
 | API key | `TYPESAFE_API_KEY` | `apiKey` | none |
 | Model | `PI_SKILL_JEV_MODEL` | `model` | `jev-latest` |
 | Max questions per request | `PI_SKILL_JEV_SHARD_SIZE` | `shardSize` | `50` |
-| Score floor, 0 to 2 | `PI_SKILL_JEV_MIN_SCORE` | `minScore` | `1.4` |
+| Score floor, 0 to 2 | `PI_SKILL_JEV_MIN_SCORE` | `minScore` | `1.6` |
 | Skills loaded per call | `PI_SKILL_JEV_MAX_SKILLS` | `maxSkills` | `3` |
 | Request timeout, ms | `PI_SKILL_JEV_TIMEOUT_MS` | `timeoutMs` | `20000` |
 | Description truncation | none | `descriptionLimit` | `1200` |
@@ -57,7 +57,7 @@ Keep the key in the config file with `0600` permissions, or in the environment. 
 ```json
 {
   "apiKey": "apikey_…",
-  "minScore": 1.4,
+  "minScore": 1.6,
   "maxSkills": 3
 }
 ```
