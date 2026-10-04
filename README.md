@@ -33,9 +33,13 @@ Every skill is rated on the same three ordered levels:
 
 Jev returns a probability-weighted position on those levels. Code applies the floor, sorts, and loads the winners. A skill has to lean toward "directly applicable" to be loaded, and ties break on confidence.
 
+Transient connection failures and retryable HTTP responses still get up to three attempts. A timed-out attempt is not resent: the server may already be processing the paid request.
+
 ## Fallback
 
 If no API key is configured or every request fails, `skill_search` falls back to deterministic lexical matching and says so in its result. The fallback returns skill metadata and paths rather than loaded instructions, so the agent decides what to read.
+
+An HTTP 402 response pauses requests for that endpoint and API key for 30 seconds within the current process. Searches keep using the same lexical fallback during the pause, and Jev ranking resumes automatically when it expires.
 
 ## Configuration
 
@@ -82,6 +86,8 @@ This extension replaces `pi-skill-search`. Uninstall that one, along with its `p
 - `maxSkills`: optional limit from 1 to 5; defaults to the configured `maxSkills`
 
 It loads the top `maxSkills` skills in full, then lists every other skill that cleared the floor with its score and path. Nothing above the floor is hidden. A task like "review this diff and hand it to codex" puts 12 skills over 1.4, so the 9 that missed the cut are named rather than dropped.
+
+Before paying to rank, `skill_search` excludes skill files that cannot be read and reports their errors. If no files are readable, it makes no request. If a selected file becomes unreadable during ranking, the other selections still load; the ranking, token usage, and file errors remain in the result.
 
 `skill_load` loads by name and never calls Jev. It accepts:
 

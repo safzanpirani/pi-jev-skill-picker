@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+	askJev,
 	buildQuestions,
 	buildRequest,
 	loadConfig,
@@ -249,6 +250,68 @@ test("rankSkills without an API key fails before any request", async () => {
 	const fakeFetch = (async () => { called = true; return new Response("{}"); }) as unknown as typeof fetch;
 	await assert.rejects(() => rankSkills("t", [skill("a", "")], config, 3, undefined, fakeFetch), /No TypeSafe API key/);
 	assert.equal(called, false);
+});
+
+test("askJev does not resend a timed-out paid request", async () => {
+	const config = { ...loadConfig({}, () => "{}"), apiKey: "k", timeoutMs: 5 };
+	let calls = 0;
+	const fakeFetch = (async (_url: string, init: RequestInit) => {
+		if (++calls === 1) throw init.signal!.reason;
+		return new Response("{}");
+	}) as unknown as typeof fetch;
+	const realTimeout = AbortSignal.timeout;
+	AbortSignal.timeout = () => AbortSignal.abort(new DOMException("The operation timed out.", "TimeoutError"));
+	try {
+		await assert.rejects(() => askJev({}, config, undefined, fakeFetch), /timed out|timeout/i);
+		assert.equal(calls, 1);
+	} finally {
+		AbortSignal.timeout = realTimeout;
+	}
+});
+
+test("askJev still retries transient HTTP errors and connection resets", async () => {
+	const config = { ...loadConfig({}, () => "{}"), apiKey: "k" };
+	for (const status of [429, 500, 502, 503, 529, undefined]) {
+		let calls = 0;
+		const fakeFetch = (async () => {
+			if (++calls === 1) {
+				if (status === undefined) throw new TypeError("ECONNRESET");
+				return new Response("try again", { status, headers: { "retry-after": "0" } });
+			}
+			return new Response("{}");
+		}) as unknown as typeof fetch;
+		await askJev({}, config, undefined, fakeFetch);
+		assert.equal(calls, 2, `retry ${status ?? "connection reset"}`);
+	}
+});
+
+test("askJev shares a short 402 cooldown only for the same endpoint and API key", async () => {
+	const config = { ...loadConfig({}, () => "{}"), apiKey: "k", endpoint: "https://credits.test" };
+	let calls = 0;
+	let exhausted = true;
+	const fakeFetch = (async () => {
+		calls++;
+		return exhausted ? new Response("no credits", { status: 402 }) : new Response("{}");
+	}) as unknown as typeof fetch;
+	const realNow = Date.now;
+	let now = realNow();
+	Date.now = () => now;
+	try {
+		await assert.rejects(() => askJev({}, config, undefined, fakeFetch), /402/);
+		await assert.rejects(() => askJev({}, { ...config }, undefined, fakeFetch), /402/);
+		assert.equal(calls, 1, "a later caller must not dispatch during the cooldown");
+
+		exhausted = false;
+		await askJev({}, { ...config, apiKey: "other-key" }, undefined, fakeFetch);
+		await askJev({}, { ...config, endpoint: "https://other.test" }, undefined, fakeFetch);
+		assert.equal(calls, 3, "other credentials and endpoints must remain usable");
+
+		now += 30_001;
+		await askJev({}, config, undefined, fakeFetch);
+		assert.equal(calls, 4, "paid ranking must resume after the cooldown expires");
+	} finally {
+		Date.now = realNow;
+	}
 });
 
 test("lexical fallback ranks an exact name match first", () => {

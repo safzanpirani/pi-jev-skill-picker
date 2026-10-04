@@ -241,6 +241,8 @@ export class JevError extends Error {
 }
 
 const RETRYABLE = new Set([429, 500, 502, 503, 529]);
+const CREDIT_COOLDOWN_MS = 30_000;
+const creditCooldowns = new Map<string, { until: number; error: JevError }>();
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 	return new Promise((resolve, reject) => {
@@ -271,8 +273,12 @@ export async function askJev(
 		);
 	}
 
+	const creditKey = JSON.stringify([config.endpoint, config.apiKey]);
 	let lastError: JevError | undefined;
 	for (let attempt = 1; attempt <= attempts; attempt++) {
+		const cooldown = creditCooldowns.get(creditKey);
+		if (cooldown && cooldown.until > Date.now()) throw cooldown.error;
+		if (cooldown) creditCooldowns.delete(creditKey);
 		const timeout = AbortSignal.timeout(config.timeoutMs);
 		const composed = signal ? AbortSignal.any([signal, timeout]) : timeout;
 		let response: Response;
@@ -289,7 +295,8 @@ export async function askJev(
 		} catch (error) {
 			if (signal?.aborted) throw new JevError("Skill ranking was cancelled.");
 			lastError = new JevError(`Request to ${config.endpoint} failed: ${error instanceof Error ? error.message : String(error)}`);
-			if (attempt === attempts) break;
+			// A timeout may leave paid server-side work running; do not resend it.
+			if (timeout.aborted || attempt === attempts) break;
 			await sleep(250 * 2 ** (attempt - 1), signal);
 			continue;
 		}
@@ -298,6 +305,9 @@ export async function askJev(
 
 		const detail = shorten(await response.text().catch(() => ""), 300);
 		lastError = new JevError(`TypeSafe returned ${response.status}${detail ? `: ${detail}` : ""}`, response.status);
+		if (response.status === 402) {
+			creditCooldowns.set(creditKey, { until: Date.now() + CREDIT_COOLDOWN_MS, error: lastError });
+		}
 		if (!RETRYABLE.has(response.status) || attempt === attempts) break;
 		const retryAfter = Number.parseFloat(response.headers.get("retry-after") ?? "");
 		await sleep(Number.isFinite(retryAfter) ? retryAfter * 1000 : 250 * 2 ** (attempt - 1), signal);
