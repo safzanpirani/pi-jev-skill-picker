@@ -18,7 +18,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "typecheck": "bunx tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsrs --noEmit -p tsconfig.json",
     "test": "bun test test/",
     "check": "bun run typecheck && bun test test/"
   },
@@ -35,6 +35,7 @@
     "@earendil-works/pi-coding-agent": "^0.84.1",
     "@earendil-works/pi-tui": "^0.84.1",
     "@types/node": "^26.2.0",
+    "tsrs": "0.16.0-ts7.1.0-dev.20260929",
     "typescript": "^5.9.3"
   }
 }
