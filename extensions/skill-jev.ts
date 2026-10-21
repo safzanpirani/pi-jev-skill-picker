@@ -38,7 +38,7 @@ function xmlAttribute(value: string): string {
 		.replaceAll(">", "&gt;");
 }
 
-function renderSkill(skill: SkillEntry, note: string, content = readFileSync(skill.filePath, "utf8")): string {
+export function renderSkill(skill: SkillEntry, note: string, content = readFileSync(skill.filePath, "utf8")): string {
 	const body = stripFrontmatter(content);
 	return [
 		`<skill name="${xmlAttribute(skill.name)}" location="${xmlAttribute(skill.filePath)}">`,
